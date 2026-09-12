@@ -1,0 +1,26 @@
+name: LiquidPanel
+version: '1.0'
+main: dev.liquidpanel.LiquidPanel
+api-version: '1.21'
+load: STARTUP
+authors: [ LELEXIAOLL ]
+
+commands:
+  liquidpanel:
+    description: LiquidPanel 主命令
+    usage: /liquidpanel help
+    aliases: [ ldp ]
+
+permissions:
+  liquidpanel.admin:
+    description: 拥有 LiquidPanel 的全部权限
+    default: op
+  liquidpanel.command.help:
+    description: 允许使用 /liquidpanel help
+    default: true
+  liquidpanel.command.reload:
+    description: 允许使用 /liquidpanel reload
+    default: op
+  liquidpanel.command.openpanel:
+    description: 允许使用 /liquidpanel openpanel（仅控制台）
+    default: op

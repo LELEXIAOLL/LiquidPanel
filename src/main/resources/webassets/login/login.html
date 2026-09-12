@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#dff3fb">
+  <title>LiquidPanel - 登录</title>
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="stylesheet" href="./login.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="login-panel" aria-labelledby="login-title">
+      <div class="eyebrow">LIQUIDPANEL</div>
+      <h1 id="login-title">欢迎回来</h1>
+      <p class="panel-subtitle">登录管理面板以继续</p>
+      <form id="login-form" novalidate>
+        <label class="field-label" for="account">账号</label>
+        <div class="input-wrap">
+          <input id="account" name="account" type="text" autocomplete="username" placeholder="账号" required>
+        </div>
+        <label class="field-label" for="password">密码</label>
+        <div class="input-wrap">
+          <input id="password" name="password" type="password" autocomplete="current-password" placeholder="密码" required>
+          <button class="visibility-toggle" id="toggle-password" type="button" aria-label="显示密码">显示</button>
+        </div>
+        <div class="form-row">
+          <label class="remember-option">
+            <input id="remember" name="remember" type="checkbox">
+            <span class="checkmark" aria-hidden="true"></span>
+            <span>记住我</span>
+          </label>
+          <a href="#" class="secondary-link" id="forgot-link">忘记密码？</a>
+        </div>
+        <button class="login-button" type="submit">登录面板</button>
+        <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+  <script src="./login.js" defer></script>
+</body>
+</html>

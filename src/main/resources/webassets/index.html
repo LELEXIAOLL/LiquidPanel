@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#dff3fb">
+  <title>LiquidPanel - 管理面板</title>
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="stylesheet" href="/assets/css/panel.css">
+</head>
+<body class="is-pending">
+
+<!-- 图标 sprite：内联在页面里，不走外链、不依赖网络，也不受 CSP 限制 -->
+<svg class="icon-sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-activity" viewBox="0 0 24 24">
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+  </symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24">
+    <rect x="4" y="4" width="16" height="16" rx="2"/>
+    <rect x="9" y="9" width="6" height="6"/>
+    <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>
+  </symbol>
+  <symbol id="i-memory" viewBox="0 0 24 24">
+    <rect x="2" y="7" width="20" height="10" rx="2"/>
+    <path d="M6 17v3M10 17v3M14 17v3M18 17v3"/>
+    <path d="M6 10h2M11 10h2M16 10h2"/>
+  </symbol>
+  <symbol id="i-users" viewBox="0 0 24 24">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </symbol>
+  <symbol id="i-disk" viewBox="0 0 24 24">
+    <line x1="22" y1="12" x2="2" y2="12"/>
+    <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+    <line x1="6" y1="16" x2="6.01" y2="16"/>
+    <line x1="10" y1="16" x2="10.01" y2="16"/>
+  </symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+  </symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24">
+    <polyline points="4 17 10 11 4 5"/>
+    <line x1="12" y1="19" x2="20" y2="19"/>
+  </symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24">
+    <path d="M12 21a9 9 0 1 1 9-9"/>
+    <path d="M12 12l4.5-3.5"/>
+  </symbol>
+  <symbol id="i-send" viewBox="0 0 24 24">
+    <line x1="22" y1="2" x2="11" y2="13"/>
+    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+  </symbol>
+</svg>
+
+<div class="app">
+
+  <!-- 整页最左上角：图标 + 名称，图标不带圆角 -->
+  <div class="brand">
+    <img class="brand__logo" src="/icon.png" alt="">
+    <span class="brand__name">LiquidPanel</span>
+  </div>
+
+  <!-- 右侧贴边：账号 / 实时状态 / 退出 -->
+  <div class="topbar">
+    <span id="current-user" class="topbar__user"></span>
+    <span id="ws-state" class="live">
+      <span class="live__dot"></span><span id="ws-text">连接中</span>
+    </span>
+    <button id="logout-button" class="btn-ghost" type="button">退出</button>
+  </div>
+
+  <!-- 左侧贴边竖排选项卡，位于图标与名称下方 -->
+  <nav class="tabs" role="tablist" aria-label="面板分页">
+    <button class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-overview" data-tab="overview">
+      <svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg>
+      <span>概览</span>
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-console" data-tab="console">
+      <svg class="icon" aria-hidden="true"><use href="#i-terminal"></use></svg>
+      <span>控制台</span>
+    </button>
+  </nav>
+
+  <div class="panes">
+
+  <main class="content" id="panel-overview" role="tabpanel">
+
+    <!-- 机器信息：只报型号 / 核心 / 容量，百分比交给下面的曲线 -->
+    <article class="card">
+      <header class="card__head">
+        <svg class="icon card__icon" aria-hidden="true"><use href="#i-cpu"></use></svg>
+        <h2 class="card__title">处理器与内存</h2>
+      </header>
+
+      <dl class="specs">
+        <div class="spec">
+          <dt>处理器</dt>
+          <dd id="cpu-model">--</dd>
+        </div>
+        <div class="spec">
+          <dt>核心数</dt>
+          <dd><span class="num" id="cpu-cores">--</span> 个逻辑核心</dd>
+        </div>
+        <div class="spec">
+          <dt>物理内存</dt>
+          <dd><span class="num" id="mem-total">--</span> 总量</dd>
+        </div>
+        <div class="spec">
+          <dt>本进程内存上限</dt>
+          <dd><span class="num" id="mem-heap-max">--</span>（-Xmx）</dd>
+        </div>
+      </dl>
+    </article>
+
+    <!-- 一行两个曲线图 -->
+    <div class="charts">
+      <article class="card chart-card">
+        <header class="card__head">
+          <svg class="icon card__icon" aria-hidden="true"><use href="#i-activity"></use></svg>
+          <h2 class="card__title">CPU 占用率</h2>
+          <label class="switch" title="叠加整机 CPU 占用率">
+            <input type="checkbox" id="cpu-dual" data-series="cpuAll">
+            <span class="switch__track"><span class="switch__thumb"></span></span>
+            <span class="switch__label">整机</span>
+          </label>
+        </header>
+
+        <div class="chart" data-chart="cpu">
+          <svg class="chart__svg" viewBox="0 0 340 132" tabindex="0" role="img"
+               aria-label="CPU 占用率曲线，鼠标悬停查看具体数值">
+            <g class="chart__grid" data-grid></g>
+            <path class="chart__line" data-line="cpu" d=""></path>
+            <path class="chart__line" data-line="cpuAll" d="" hidden></path>
+            <g class="chart__hover" data-hover hidden>
+              <line class="chart__hair" data-hair y1="10" y2="114"></line>
+              <circle class="chart__dot" data-dot="cpu" r="4" hidden></circle>
+              <circle class="chart__dot" data-dot="cpuAll" r="4" hidden></circle>
+            </g>
+            <g class="chart__axis" data-axis></g>
+          </svg>
+          <div class="chart__tooltip" data-tooltip hidden></div>
+        </div>
+
+        <div class="legend" data-legend hidden>
+          <span class="legend__item"><i class="legend__swatch swatch--process"></i>本进程</span>
+          <span class="legend__item"><i class="legend__swatch swatch--machine"></i>整机</span>
+        </div>
+      </article>
+
+      <article class="card chart-card">
+        <header class="card__head">
+          <svg class="icon card__icon" aria-hidden="true"><use href="#i-memory"></use></svg>
+          <h2 class="card__title">内存占用</h2>
+          <label class="switch" title="叠加整机内存占用率">
+            <input type="checkbox" id="mem-dual" data-series="memAll">
+            <span class="switch__track"><span class="switch__thumb"></span></span>
+            <span class="switch__label">整机</span>
+          </label>
+        </header>
+
+        <div class="chart" data-chart="mem">
+          <svg class="chart__svg" viewBox="0 0 340 132" tabindex="0" role="img"
+               aria-label="内存占用率曲线，鼠标悬停查看具体数值">
+            <g class="chart__grid" data-grid></g>
+            <path class="chart__line" data-line="mem" d=""></path>
+            <path class="chart__line" data-line="memAll" d="" hidden></path>
+            <g class="chart__hover" data-hover hidden>
+              <line class="chart__hair" data-hair y1="10" y2="114"></line>
+              <circle class="chart__dot" data-dot="mem" r="4" hidden></circle>
+              <circle class="chart__dot" data-dot="memAll" r="4" hidden></circle>
+            </g>
+            <g class="chart__axis" data-axis></g>
+          </svg>
+          <div class="chart__tooltip" data-tooltip hidden></div>
+        </div>
+
+        <div class="legend" data-legend hidden>
+          <span class="legend__item"><i class="legend__swatch swatch--process"></i>本进程</span>
+          <span class="legend__item"><i class="legend__swatch swatch--machine"></i>整机</span>
+        </div>
+
+        <!-- 不悬停时也能看到具体数值 -->
+        <p class="chart__current" id="mem-current">--</p>
+      </article>
+    </div>
+
+    <div class="grid">
+      <!-- 在线玩家 + 曲线 -->
+      <article class="card chart-card card--span2">
+        <header class="card__head">
+          <svg class="icon card__icon" aria-hidden="true"><use href="#i-users"></use></svg>
+          <h2 class="card__title">在线玩家</h2>
+          <span class="big-number big-number--inline">
+            <span class="num" id="players-online">--</span><small id="players-max">/ --</small>
+          </span>
+        </header>
+
+        <div class="chart" data-chart="players">
+          <svg class="chart__svg" viewBox="0 0 340 132" tabindex="0" role="img"
+               aria-label="在线人数曲线，鼠标悬停查看具体数值">
+            <g class="chart__grid" data-grid></g>
+            <path class="chart__line" data-line="players" d=""></path>
+            <g class="chart__hover" data-hover hidden>
+              <line class="chart__hair" data-hair y1="10" y2="114"></line>
+              <circle class="chart__dot" data-dot="players" r="4" hidden></circle>
+            </g>
+            <g class="chart__axis" data-axis></g>
+          </svg>
+          <div class="chart__tooltip" data-tooltip hidden></div>
+        </div>
+
+        <div class="chips" id="player-chips"></div>
+        <p class="chips__empty" id="players-empty" hidden>当前没有玩家在线</p>
+      </article>
+
+
+      <!-- TPS：三个统计窗口各自可开关 -->
+      <article class="card chart-card card--span2" data-card="tps">
+        <header class="card__head">
+          <svg class="icon card__icon" aria-hidden="true"><use href="#i-gauge"></use></svg>
+          <h2 class="card__title">TPS</h2>
+          <span class="tps-now">
+            <span class="num" id="tps-now">--</span>
+          </span>
+          <label class="switch" title="叠加 5 分钟平均">
+            <input type="checkbox" data-series="tps5">
+            <span class="switch__track"><span class="switch__thumb"></span></span>
+            <span class="switch__label">5m</span>
+          </label>
+          <label class="switch" title="叠加 15 分钟平均">
+            <input type="checkbox" data-series="tps15">
+            <span class="switch__track"><span class="switch__thumb"></span></span>
+            <span class="switch__label">15m</span>
+          </label>
+        </header>
+
+        <div class="chart" data-chart="tps">
+          <svg class="chart__svg" viewBox="0 0 340 132" tabindex="0" role="img"
+               aria-label="TPS 曲线，鼠标悬停查看具体数值">
+            <g class="chart__grid" data-grid></g>
+            <path class="chart__line" data-line="tps1" d=""></path>
+            <path class="chart__line" data-line="tps5" d="" hidden></path>
+            <path class="chart__line" data-line="tps15" d="" hidden></path>
+            <g class="chart__hover" data-hover hidden>
+              <line class="chart__hair" data-hair y1="10" y2="114"></line>
+              <circle class="chart__dot" data-dot="tps1" r="4" hidden></circle>
+              <circle class="chart__dot" data-dot="tps5" r="4" hidden></circle>
+              <circle class="chart__dot" data-dot="tps15" r="4" hidden></circle>
+            </g>
+            <g class="chart__axis" data-axis></g>
+          </svg>
+          <div class="chart__tooltip" data-tooltip hidden></div>
+        </div>
+
+        <div class="legend" data-legend hidden></div>
+      </article>
+      <article class="card">
+        <header class="card__head">
+          <svg class="icon card__icon" aria-hidden="true"><use href="#i-disk"></use></svg>
+          <h2 class="card__title">硬盘占用</h2>
+        </header>
+        <div class="ring-wrap">
+          <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="ring__track" cx="60" cy="60" r="52"/>
+            <circle class="ring__value" cx="60" cy="60" r="52" id="disk-ring"/>
+          </svg>
+          <div class="ring__center">
+            <span class="ring__percent"><span class="num" id="disk-percent">--</span><small>%</small></span>
+            <span class="ring__detail" id="disk-detail">--</span>
+          </div>
+        </div>
+        <p class="card__foot" id="disk-path">--</p>
+      </article>
+
+      <!-- 扫出来不存在的世界文件夹，卡片会被整张隐藏 -->
+      <article class="card" data-folder="world">
+        <header class="card__head">
+          <svg class="icon card__icon" aria-hidden="true"><use href="#i-folder"></use></svg>
+          <h2 class="card__title">world</h2>
+        </header>
+        <p class="big-number"><span class="num" id="folder-world">--</span></p>
+        <div class="share"><div class="share__fill" id="share-world"></div></div>
+        <p class="card__foot">主世界</p>
+      </article>
+
+      <article class="card" data-folder="world_nether">
+        <header class="card__head">
+          <svg class="icon card__icon" aria-hidden="true"><use href="#i-folder"></use></svg>
+          <h2 class="card__title">world_nether</h2>
+        </header>
+        <p class="big-number"><span class="num" id="folder-world_nether">--</span></p>
+        <div class="share"><div class="share__fill" id="share-world_nether"></div></div>
+        <p class="card__foot">下界</p>
+      </article>
+
+      <article class="card" data-folder="world_the_end">
+        <header class="card__head">
+          <svg class="icon card__icon" aria-hidden="true"><use href="#i-folder"></use></svg>
+          <h2 class="card__title">world_the_end</h2>
+        </header>
+        <p class="big-number"><span class="num" id="folder-world_the_end">--</span></p>
+        <div class="share"><div class="share__fill" id="share-world_the_end"></div></div>
+        <p class="card__foot">末地</p>
+      </article>
+    </div>
+
+  </main>
+
+  <main class="content" id="panel-console" role="tabpanel" hidden>
+
+    <!-- 实时控制台日志 -->
+    <article class="card log-card">
+      <header class="card__head">
+        <svg class="icon card__icon" aria-hidden="true"><use href="#i-terminal"></use></svg>
+        <h2 class="card__title">控制台日志</h2>
+        <span class="log-card__meta" id="log-meta">--</span>
+        <label class="switch" title="新日志到达时自动滚到底部">
+          <input type="checkbox" id="log-autoscroll" checked>
+          <span class="switch__track"><span class="switch__thumb"></span></span>
+          <span class="switch__label">自动滚动</span>
+        </label>
+      </header>
+
+      <div class="log" id="log-view" role="log" aria-live="polite" aria-label="服务端控制台实时日志"></div>
+    </article>
+
+    <!-- 命令输入 -->
+    <article class="card console-card">
+      <header class="card__head">
+        <svg class="icon card__icon" aria-hidden="true"><use href="#i-send"></use></svg>
+        <h2 class="card__title">执行命令</h2>
+      </header>
+
+      <div class="console-input">
+        <input id="command-input" type="text" autocomplete="off" spellcheck="false"
+               placeholder="输入命令后回车执行，不需要带 /" aria-label="要执行的命令">
+        <button id="command-run" class="btn-run" type="button">执行</button>
+      </div>
+      <p class="console-hint" id="command-hint">以控制台身份执行，等同于直接在服务端控制台输入。上下方向键可翻历史。</p>
+    </article>
+
+  </main>
+
+  </div>
+</div>
+
+<!-- 仍在用初始密码时的强制弹窗：不可关闭，改完为止 -->
+<div class="modal" id="setup-modal" hidden>
+  <div class="modal__backdrop"></div>
+  <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <h2 class="modal__title" id="setup-title">请修改初始账号密码</h2>
+    <p class="modal__desc">
+      当前面板仍在使用自动生成的初始密码。为安全起见，请设置新的用户名与密码。
+      修改完成后所有登录状态都会失效，需要用新账号重新登录。
+    </p>
+
+    <form id="setup-form">
+      <label class="field">
+        <span>新的用户名</span>
+        <input id="setup-username" type="text" autocomplete="username" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>新的密码</span>
+        <input id="setup-password" type="password" autocomplete="new-password">
+      </label>
+      <label class="field">
+        <span>再次确认密码</span>
+        <input id="setup-confirm" type="password" autocomplete="new-password">
+      </label>
+
+      <p class="modal__error" id="setup-error" hidden></p>
+      <button type="submit" class="btn-run" id="setup-submit">修改</button>
+    </form>
+  </div>
+</div>
+
+<script src="/assets/js/panel.js" defer></script>
+</body>
+</html>

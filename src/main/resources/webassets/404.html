@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#dff3fb">
+  <title>LiquidPanel - 页面不存在</title>
+  <link rel="icon" type="image/png" href="/icon.png">
+  <style>
+    :root {
+      color-scheme: light only;
+      --ink: #1e6688;
+      --muted: #6a9bb2;
+      --line: #a9d9eb;
+      --blue: #55b8df;
+      --blue-dark: #2999c5;
+      --white-glass: rgba(255, 255, 255, 0.88);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+    }
+
+    body {
+      overflow: hidden;
+      background: #dff3fb;
+      color: var(--ink);
+      font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    .page-shell {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 28px 18px;
+    }
+
+    .not-found {
+      width: min(100%, 410px);
+      padding: 42px 42px 34px;
+      border: 1px solid rgba(255, 255, 255, 0.78);
+      border-radius: 18px;
+      background: var(--white-glass);
+      box-shadow: 0 24px 70px rgba(2, 37, 61, 0.26), 0 4px 18px rgba(4, 65, 100, 0.12);
+      backdrop-filter: blur(22px) saturate(118%);
+      -webkit-backdrop-filter: blur(22px) saturate(118%);
+      text-align: center;
+    }
+
+    .eyebrow {
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2.8px;
+    }
+
+    .code {
+      margin: 9px 0 7px;
+      color: #216887;
+      font-size: 64px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: 3px;
+    }
+
+    .subtitle {
+      margin: 0 0 28px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .home-link {
+      display: inline-block;
+      padding: 13px 26px;
+      border: 1px solid #49acd1;
+      border-radius: 10px;
+      background: var(--blue);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      text-decoration: none;
+      transition: background 0.3s cubic-bezier(0.22, 1, 0.36, 1), transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .home-link:hover {
+      background: var(--blue-dark);
+      box-shadow: 0 8px 18px rgba(41, 153, 197, 0.22);
+      transform: translateY(-1px);
+    }
+
+    .home-link:active {
+      transform: translateY(1px);
+    }
+
+    @media (max-width: 480px) {
+      .page-shell {
+        padding: 18px 14px;
+      }
+
+      .not-found {
+        padding: 32px 25px 26px;
+        border-radius: 15px;
+      }
+
+      .code {
+        font-size: 52px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page-shell">
+    <section class="not-found">
+      <div class="eyebrow">LIQUIDPANEL</div>
+      <p class="code">404</p>
+      <p class="subtitle">这个页面不存在，或者已经被移走了。</p>
+      <a class="home-link" href="/">返回面板</a>
+    </section>
+  </main>
+</body>
+</html>

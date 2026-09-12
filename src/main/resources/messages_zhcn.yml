@@ -1,0 +1,57 @@
+# ==========================================================
+#  LiquidPanel 语言文件 - 简体中文 (zhcn)
+#  文件内所有 & 都会被无条件替换为 §，请勿使用裸的 &
+#  占位符形如 %player%，由代码在调用时替换
+#
+#  注意：插件会以本文件为模板校验服务端上的同名文件，
+#  缺失配置项或类型写错时，会自动把原文件备份为
+#  messages_zhcn.yml.bak 并重新释放本文件。
+# ==========================================================
+
+# 插件前缀，游戏内所有聊天栏提示与控制台提示都会带上它
+prefix: "&bLiquidPanel &7>> "
+
+general:
+  no_permission: "&c你没有权限执行该命令。"
+  unknown_command: "&c未知的子命令 &e%command% &c，请使用 &e/liquidpanel help &c查看帮助。"
+  command_error: "&c执行子命令 &e%command% &c时发生异常：&f%error%"
+
+command:
+  not_registered: "&c未能在 plugin.yml 中找到命令 &e%command% &c，请检查插件文件是否完整。"
+
+reload:
+  start: "&7正在重新载入配置文件与语言文件..."
+  success: "&a配置文件与语言文件已重新载入完成 &7(&e%time%ms&7)"
+  success_console: "&a配置文件与语言文件已由 &e%player% &a重新载入完成 &7(&e%time%ms&7)"
+  failed: "&c重新载入失败，请查看控制台日志。"
+  failed_console: "&c重新载入配置时发生异常：&f%error%"
+
+help:
+  header: "&8&m----------&r &bLiquidPanel &7帮助列表 &8&m----------"
+  entry: "&e/%command% %usage% &7- &f%description%"
+  footer: "&8&m----------&r &7共 &e%amount% &7条命令 &8&m----------"
+  description:
+    help: "查看帮助列表"
+    reload: "重新载入配置文件与语言文件"
+    openpanel: "在浏览器中打开网页面板（仅控制台）"
+
+panel:
+  account:
+    created: "&a未找到面板账户文件，已生成默认账户并释放到 &e%file%"
+    username: "&7面板默认账号：&e%username%"
+    password: "&7面板默认密码：&e%password%"
+    warning: "&c这串密码只显示这一次，account.json 里存的是摘要无法找回；忘记请删除 account.json 重新生成。"
+    save_failed: "&c面板账户文件 &e%file% &c写入失败，请检查插件目录权限。"
+  command:
+    console_only: "&c该命令仅能在服务端控制台执行。"
+  host:
+    rejected: "&e已拒绝对 Host 为 &f%host% &e的请求。若这是你访问面板用的域名，请把它加进 config.yml 的 panel.allowed_hosts，否则登录会被拒绝。"
+  browser:
+    opening: "&7正在打开浏览器访问网页面板 &e%url%"
+    failed: "&c未能自动打开浏览器（服务端可能没有桌面环境），请手动访问 &e%url%"
+  server:
+    started: "&a网页面板已启动：&e%url%"
+    start_failed: "&c网页面板启动失败：&f%error%"
+    stopped: "&7网页面板已停止。"
+    disabled: "&7网页面板已在配置中禁用。"
+    not_running: "&c网页面板当前未运行，请检查配置或控制台日志。"
