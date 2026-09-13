@@ -194,9 +194,13 @@ public final class SystemMetrics {
     // ------------------------------------------------------------------
 
     /**
-     * 服务端所在盘符的占用情况。
+     * 磁盘占用：服务端文件夹本身多大，以及它所在的盘还剩多少。
      *
-     * <p>用 {@code getUsableSpace} 而不是 {@code getFreeSpace}：
+     * <p>{@code serverBytes} 不在这里现算 —— 递归遍历几十万个文件是重 IO，
+     * 由 {@link DirectorySizeScanner} 每 5 分钟异步扫一次，这里只取缓存。
+     * {@code serverScanned} 用来告诉前端「还没扫过」和「扫出来就是 0 字节」的区别。
+     *
+     * <p>盘容量用 {@code getUsableSpace} 而不是 {@code getFreeSpace}：
      * 前者扣掉了进程无权使用的保留块，更接近「还能不能写进去」。
      */
     private Map<String, Object> disk() {
@@ -206,6 +210,8 @@ public final class SystemMetrics {
         Map<String, Object> disk = new LinkedHashMap<>();
         disk.put("path", path.toString());
         disk.put("root", root == null ? "/" : root.toString());
+        disk.put("serverBytes", directoryScanner.getRootBytes());
+        disk.put("serverScanned", directoryScanner.getLastScanAt() > 0L);
 
         long total = 0L;
         long usable = 0L;

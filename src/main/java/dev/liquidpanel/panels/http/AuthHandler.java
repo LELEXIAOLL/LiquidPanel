@@ -213,7 +213,9 @@ public final class AuthHandler {
         if (!changed) {
             // 校验失败同样计入封禁计数，否则这里就是个可以无限试探的口子
             loginGuard.recordFailure(ip);
-            HttpUtil.sendError(exchange, 401, "原密码不正确");
+            // 用 403 而不是 401：前端把 401 统一当作「会话失效」并跳登录页，
+            // 用 401 的话密码输错一次就会被踢出去
+            HttpUtil.sendError(exchange, 403, "原密码不正确");
             return;
         }
         loginGuard.recordSuccess(ip);
@@ -283,7 +285,8 @@ public final class AuthHandler {
         try {
             if (!initialSetup && !accountManager.verify(accountManager.getUsername(), oldPassword)) {
                 loginGuard.recordFailure(HttpUtil.clientIp(exchange));
-                HttpUtil.sendError(exchange, 401, "原密码不正确");
+                // 同上：这里必须避开 401，否则前端会把「密码输错」当成「会话过期」
+                HttpUtil.sendError(exchange, 403, "原密码不正确");
                 return;
             }
             applied = accountManager.changeCredentials(username, newPassword);

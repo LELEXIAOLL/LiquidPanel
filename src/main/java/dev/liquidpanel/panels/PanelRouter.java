@@ -3,8 +3,11 @@ package dev.liquidpanel.panels;
 import dev.liquidpanel.panels.http.ApiResponse;
 import dev.liquidpanel.panels.http.AuthHandler;
 import dev.liquidpanel.panels.http.CommandHandler;
+import dev.liquidpanel.panels.http.FileHandler;
 import dev.liquidpanel.panels.http.HttpUtil;
 import dev.liquidpanel.panels.http.LogHandler;
+import dev.liquidpanel.panels.http.PlayerHandler;
+import dev.liquidpanel.panels.http.SettingsHandler;
 import dev.liquidpanel.panels.http.StatusHandler;
 import dev.liquidpanel.panels.security.SessionManager;
 import io.undertow.server.HttpHandler;
@@ -42,6 +45,9 @@ public final class PanelRouter implements HttpHandler {
     private static final String API_PREFIX = "/api/";
     private static final String WEBSOCKET_PATH = "/ws";
 
+    /** 上传接口，需要单独处理实体上限与接收方式 */
+    private static final String UPLOAD_PATH = "/api/files/upload";
+
     /** 登录页所在目录，这一整个前缀都不做登录校验 */
     private static final String LOGIN_PREFIX = "/login/";
 
@@ -74,6 +80,9 @@ public final class PanelRouter implements HttpHandler {
     private final StatusHandler statusHandler;
     private final LogHandler logHandler;
     private final CommandHandler commandHandler;
+    private final FileHandler fileHandler;
+    private final PlayerHandler playerHandler;
+    private final SettingsHandler settingsHandler;
     private final SessionManager sessionManager;
     private final HttpHandler webSocketHandler;
 
@@ -85,6 +94,9 @@ public final class PanelRouter implements HttpHandler {
                        StatusHandler statusHandler,
                        LogHandler logHandler,
                        CommandHandler commandHandler,
+                       FileHandler fileHandler,
+                       PlayerHandler playerHandler,
+                       SettingsHandler settingsHandler,
                        SessionManager sessionManager,
                        HttpHandler webSocketHandler) {
         this.assetManager = assetManager;
@@ -92,6 +104,9 @@ public final class PanelRouter implements HttpHandler {
         this.statusHandler = statusHandler;
         this.logHandler = logHandler;
         this.commandHandler = commandHandler;
+        this.fileHandler = fileHandler;
+        this.playerHandler = playerHandler;
+        this.settingsHandler = settingsHandler;
         this.sessionManager = sessionManager;
         this.webSocketHandler = webSocketHandler;
         this.workerHandler = this::handleInWorker;
@@ -110,6 +125,15 @@ public final class PanelRouter implements HttpHandler {
         // WebSocket 升级必须在 IO 线程上完成，不能经过工作线程派发
         if (WEBSOCKET_PATH.equals(path)) {
             webSocketHandler.handleRequest(exchange);
+            return;
+        }
+
+        if (UPLOAD_PATH.equals(path)) {
+            // 上传文件可能有几百 MB，不能走下面的 receiveFullBytes —— 那会把整个文件读进内存。
+            // 这里只放宽实体上限，然后直接派发到工作线程，
+            // 由 handler 用阻塞流边读边写盘。
+            exchange.setMaxEntitySize(FileHandler.MAX_UPLOAD_BYTES);
+            exchange.dispatch(workerHandler);
             return;
         }
 
@@ -162,6 +186,15 @@ public final class PanelRouter implements HttpHandler {
             case "/api/status" -> statusHandler.status(exchange);
             case "/api/logs" -> logHandler.logs(exchange);
             case "/api/console" -> commandHandler.execute(exchange);
+            case "/api/files" -> fileHandler.list(exchange);
+            case "/api/files/download" -> fileHandler.download(exchange);
+            case "/api/files/action" -> fileHandler.action(exchange);
+            case "/api/files/upload" -> fileHandler.upload(exchange);
+            case "/api/files/text" -> fileHandler.text(exchange);
+            case "/api/players" -> playerHandler.list(exchange);
+            case "/api/players/skin" -> playerHandler.skin(exchange);
+            case "/api/players/action" -> playerHandler.action(exchange);
+            case "/api/settings" -> settingsHandler.handle(exchange);
             default -> HttpUtil.sendJson(exchange, 404, ApiResponse.error("接口不存在"));
         }
     }

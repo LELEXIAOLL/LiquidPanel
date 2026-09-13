@@ -1,9 +1,11 @@
 package dev.liquidpanel.panels;
 
+import dev.liquidpanel.panels.economy.EconomyService;
+import dev.liquidpanel.panels.players.DataRevision;
+import dev.liquidpanel.panels.players.PlayerService;
 import dev.liquidpanel.utils.TpsTracker;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
@@ -20,8 +22,23 @@ import java.util.Map;
  */
 public final class PanelStatusCollector {
 
+    private final PlayerService playerService;
+
+    /** 玩家数据版本号，让前端知道名册与封禁状态什么时候变了 */
+    private final DataRevision revision;
+
+    /** 经济系统，前端据此决定显不显示余额那一项 */
+    private final EconomyService economy;
+
     private final long startTime = System.currentTimeMillis();
     private final TpsTracker tpsTracker = new TpsTracker();
+
+    public PanelStatusCollector(PlayerService playerService, DataRevision revision,
+                                EconomyService economy) {
+        this.playerService = playerService;
+        this.revision = revision;
+        this.economy = economy;
+    }
 
     /**
      * 开始统计 TPS。需要在主线程调用（由主类在启用时触发）。
@@ -56,6 +73,11 @@ public final class PanelStatusCollector {
         status.put("maxPlayers", Bukkit.getMaxPlayers());
         status.put("memory", collectMemory());
         status.put("players", collectPlayers());
+        // 只是个数字，跟着状态推过去。前端发现它变了才重新拉玩家列表 ——
+        // 名册和封禁状态的变化频率远低于坐标，不值得每次都推全量
+        status.put("playersRevision", revision.get());
+        // 经济是否可用是全局的，前端拿它决定要不要显示余额那一项
+        status.put("economyAvailable", economy.isAvailable());
         status.put("worlds", collectWorlds());
         status.put("timestamp", System.currentTimeMillis());
         return status;
@@ -87,18 +109,13 @@ public final class PanelStatusCollector {
         return memory;
     }
 
-    private List<Map<String, Object>> collectPlayers() {
-        List<Map<String, Object>> players = new ArrayList<>();
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("name", player.getName());
-            item.put("world", player.getWorld().getName());
-            item.put("ping", player.getPing());
-            item.put("health", round(player.getHealth()));
-            item.put("gameMode", player.getGameMode().name());
-            players.add(item);
-        }
-        return players;
+    /**
+     * 在线玩家。本方法在主线程执行，所以可以直接取快照。
+     *
+     * <p>概览的玩家标签与玩家管理页用的是同一份数据，不会两处对不上。
+     */
+    private List<PlayerService.Entry> collectPlayers() {
+        return playerService.snapshotOnline();
     }
 
     private List<Map<String, Object>> collectWorlds() {

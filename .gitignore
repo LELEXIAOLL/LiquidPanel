@@ -1,2 +1,5 @@
 /cyber/
 /.idea/
+/build/
+/.gradle/
+/other/

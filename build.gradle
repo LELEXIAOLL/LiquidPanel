@@ -24,8 +24,31 @@ dependencies {
     // 所以直接引用 log4j-core。服务端自带，用 compileOnly 不打进插件。
     compileOnly("org.apache.logging.log4j:log4j-core:2.24.1")
 
+    // Vault 经济 API。只在编译期用，不打进 jar —— 运行期由服务端上装的 Vault 插件提供。
+    //
+    // 不用 Maven 坐标：VaultAPI 只发布在 JitPack 上，国内拉取不稳，
+    // 直接引用仓库里这份 jar。Vault 的 Economy 接口多年未变，拿哪一版编译都一样。
+    //
+    // 红线：不要在源码里自己写一个 net.milkbowl.vault.economy.Economy。
+    // Bukkit 的插件类加载器是「先查自己的 jar」，同名类会把 Vault 那份遮住，
+    // 于是 Vault 的实现类实现的就成了另一个接口，instanceof 与转型全部失效。
+    compileOnly(files("other/Vault.jar"))
+
     // 网页面板：HTTP + WebSocket。会随插件一起打包，见下面的 jar 配置。
     implementation("io.undertow:undertow-core:2.3.18.Final")
+
+    // 7z 压缩与解压。JDK 完全没有 7z 支持，zip 仍用 JDK 自带的 java.util.zip。
+    implementation("org.apache.commons:commons-compress:1.27.1")
+    implementation("org.tukaani:xz:1.9")
+
+    // 临时封禁记录的 SQLite 存储。驱动里含 23 个平台的本地库，整包约 12.9MB，
+    // 其中真正的 Java 代码不到 1MB —— 剩下的都是各个 Linux / Windows / macOS 架构的
+    // sqlitejdbc 二进制。选了 json 存储的话这个包不会被加载，但也没法从 jar 里省掉。
+    //
+    // 不能排除它传递引入的 slf4j-api：sqlite-jdbc 的 JDBC、SQLiteJDBCLoader、NativeDB、
+    // OSInfo、JDBC3DatabaseMetaData 等 9 个类直接引用了 org.slf4j，而且都在核心路径上，
+    // 排掉会 NoClassDefFoundError。slf4j-api 自身只有 40KB 且不带 SPI 声明，没有副作用。
+    implementation("org.xerial:sqlite-jdbc:3.45.3.0")
 }
 
 tasks {

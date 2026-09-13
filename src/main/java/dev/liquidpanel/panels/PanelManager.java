@@ -1,9 +1,23 @@
 package dev.liquidpanel.panels;
 
 import dev.liquidpanel.configs.MessagesManager;
+import dev.liquidpanel.panels.database.DatabaseManager;
+import dev.liquidpanel.panels.economy.EconomyService;
 import dev.liquidpanel.panels.http.AuthHandler;
+import dev.liquidpanel.panels.files.ArchiveService;
+import dev.liquidpanel.panels.files.FileService;
+import dev.liquidpanel.panels.files.ServerPaths;
 import dev.liquidpanel.panels.http.CommandHandler;
+import dev.liquidpanel.panels.http.FileHandler;
 import dev.liquidpanel.panels.http.LogHandler;
+import dev.liquidpanel.panels.http.PlayerHandler;
+import dev.liquidpanel.panels.http.SettingsHandler;
+import dev.liquidpanel.panels.players.BanService;
+import dev.liquidpanel.panels.players.DataRevision;
+import dev.liquidpanel.panels.players.PlayerRegistry;
+import dev.liquidpanel.panels.players.PlayerService;
+import dev.liquidpanel.panels.players.SkinService;
+import dev.liquidpanel.panels.settings.PanelConfigManager;
 import dev.liquidpanel.panels.http.StatusHandler;
 import dev.liquidpanel.panels.logs.ConsoleLogCollector;
 import dev.liquidpanel.panels.logs.ConsoleLogStore;
@@ -47,6 +61,24 @@ public final class PanelManager {
     /** 日志推送间隔（游戏刻），10 刻 = 0.5 秒。日志和指标不同，慢了就没有「实时」的感觉 */
     private static final long LOG_PUSH_INTERVAL_TICKS = 10L;
 
+    /**
+     * 玩家列表推送间隔（游戏刻），3 刻 ≈ 0.15 秒。
+     *
+     * <p>玩家坐标一直在动，传送到 {@code ~ ~10 ~} 这类相对坐标时，
+     * 弹窗里显示的坐标必须是新的，慢了就等于给了个过时的参考值。
+     * 这份数据很小（每个玩家几个字段），单独高频推，不拖累 2 秒一次的整体状态。
+     */
+    private static final long PLAYER_PUSH_INTERVAL_TICKS = 3L;
+
+    /**
+     * 临时封禁到期检查间隔（游戏刻），200 刻 = 10 秒。
+     *
+     * <p>到期时间本身只是给管理员填的一个大概时长，
+     * 多等十秒对「封三天」没有任何意义，而每次检查都要读一遍存储，
+     * 频率再高只是白烧 IO。
+     */
+    private static final long BAN_CHECK_INTERVAL_TICKS = 200L;
+
     private final JavaPlugin plugin;
 
     private final PanelSettings settings = new PanelSettings();
@@ -56,23 +88,62 @@ public final class PanelManager {
     private final LoginGuard loginGuard = new LoginGuard();
     private final HostValidator hostValidator = new HostValidator();
     private final WebSocketHub webSocketHub = new WebSocketHub();
-    private final PanelStatusCollector statusCollector = new PanelStatusCollector();
     private final SystemMetrics systemMetrics;
-    private final PanelStatusProvider statusProvider;
     private final ConsoleLogCollector consoleLog;
+    private final ServerPaths serverPaths;
+    private final PanelConfigManager panelConfig;
+    private final EconomyService economyService;
+    private final DatabaseManager database;
+    private final SkinService skinService = new SkinService();
+
+    /**
+     * 名册与封禁状态的版本号。名册那边由上下线事件推高，
+     * 封禁那边由封禁 / 解封 / 到期解除推高，最后跟着状态推送发给前端。
+     */
+    private final DataRevision dataRevision = new DataRevision();
+
+    /*
+     * 下面这一串的依赖链是 database -> PlayerRegistry -> PlayerService
+     * -> PanelStatusCollector -> PanelStatusProvider，全都要等存储开好之后才能建，
+     * 所以放在 init() 里而不是构造器里，也都不是 final。
+     */
+    private PlayerRegistry playerRegistry;
+    private PlayerService playerService;
+    private PanelStatusCollector statusCollector;
+    private PanelStatusProvider statusProvider;
+    private BanService banService;
 
     private PanelServer server;
     private BukkitTask pushTask;
     private BukkitTask maintenanceTask;
     private BukkitTask logTask;
+    private BukkitTask playerTask;
+    private BukkitTask banTask;
 
     public PanelManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.assetManager = new WebAssetManager(plugin);
         this.accountManager = new AccountManager(plugin);
         this.systemMetrics = new SystemMetrics(resolveServerRoot());
-        this.statusProvider = new PanelStatusProvider(statusCollector, systemMetrics);
         this.consoleLog = new ConsoleLogCollector();
+        this.serverPaths = resolvePaths();
+        this.panelConfig = new PanelConfigManager(plugin);
+        this.economyService = new EconomyService(panelConfig);
+        this.database = new DatabaseManager(plugin);
+    }
+
+    /** 依赖存储的那些组件，统一在这里按依赖顺序建起来 */
+    private void buildStores() {
+        database.init();
+
+        playerRegistry = new PlayerRegistry(database.playerStore(), dataRevision);
+        playerRegistry.init(plugin);
+
+        playerService = new PlayerService(playerRegistry, database.banStore(), economyService);
+        banService = new BanService(database.banStore(), panelConfig, dataRevision);
+
+        statusCollector = new PanelStatusCollector(playerService, dataRevision, economyService);
+        statusProvider = new PanelStatusProvider(statusCollector, systemMetrics);
     }
 
     // ------------------------------------------------------------------
@@ -88,6 +159,12 @@ public final class PanelManager {
 
         // 账户文件无论面板是否启用都先生成，方便管理员提前拿到密码
         accountManager.init();
+        // 面板运行时设置（网页上直接改的那些），不存在就写一份默认的
+        panelConfig.init();
+
+        // 存储放前面：它跟面板开关无关 —— 面板关着的时候，
+        // 已经记下的临时封禁照样要到期解除，名册也照样要维护
+        buildStores();
 
         if (!settings.isEnabled()) {
             MessagesManager.log("panel.server.disabled");
@@ -130,6 +207,14 @@ public final class PanelManager {
      */
     public void shutdown() {
         stop();
+        // 名册在这里收尾而不是 stop() 里：面板停掉不代表玩家不来了，
+        // 名册要一直维护到插件卸载为止
+        if (playerRegistry != null) {
+            playerRegistry.stop();
+        }
+        // 存储只在关服时收尾：reload 会把面板停掉再拉起来，
+        // 不该顺带把库关一遍又开一遍
+        database.close();
     }
 
     /**
@@ -161,8 +246,11 @@ public final class PanelManager {
      */
     public synchronized void stop() {
         cancelTasks();
-        // 挂在调度器上的任务必须一起停掉
-        statusCollector.stop();
+        // 挂在调度器上的任务必须一起停掉。
+        // statusCollector 是 init() 里才建的，加个判空兜住「init 没跑完就被停」的极端情况
+        if (statusCollector != null) {
+            statusCollector.stop();
+        }
         systemMetrics.stop();
         consoleLog.uninstall();
         webSocketHub.closeAll("面板已关闭");
@@ -190,6 +278,19 @@ public final class PanelManager {
         File plugins = dataFolder.getParentFile();
         File root = plugins == null ? null : plugins.getParentFile();
         return root == null ? dataFolder : root;
+    }
+
+    /**
+     * 文件管理的安全边界。根目录解析失败（正常不会发生）时返回 null，
+     * 此时文件相关的接口一律回 503，不影响面板其它功能。
+     */
+    private ServerPaths resolvePaths() {
+        try {
+            return new ServerPaths(resolveServerRoot());
+        } catch (Exception e) {
+            MessagesManager.logRaw("§c无法解析服务端根目录，文件管理已禁用: " + e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -250,6 +351,12 @@ public final class PanelManager {
         StatusHandler statusHandler = new StatusHandler(sessionManager, statusProvider);
         LogHandler logHandler = new LogHandler(sessionManager, consoleLog);
         CommandHandler commandHandler = new CommandHandler(sessionManager, hostValidator, plugin);
+        FileHandler fileHandler = new FileHandler(sessionManager, hostValidator, serverPaths,
+                new FileService(serverPaths), new ArchiveService());
+        PlayerHandler playerHandler = new PlayerHandler(sessionManager, hostValidator,
+                playerService, skinService, banService, economyService);
+        SettingsHandler settingsHandler = new SettingsHandler(sessionManager, hostValidator,
+                panelConfig, economyService);
         PanelWebSocketHandler webSocketHandler =
                 new PanelWebSocketHandler(sessionManager, webSocketHub, hostValidator);
 
@@ -259,6 +366,9 @@ public final class PanelManager {
                 statusHandler,
                 logHandler,
                 commandHandler,
+                fileHandler,
+                playerHandler,
+                settingsHandler,
                 sessionManager,
                 Handlers.websocket(webSocketHandler));
     }
@@ -278,6 +388,12 @@ public final class PanelManager {
 
         logTask = Bukkit.getScheduler().runTaskTimerAsynchronously(
                 plugin, this::pushLogs, LOG_PUSH_INTERVAL_TICKS, LOG_PUSH_INTERVAL_TICKS);
+
+        playerTask = Bukkit.getScheduler().runTaskTimerAsynchronously(
+                plugin, this::pushPlayers, PLAYER_PUSH_INTERVAL_TICKS, PLAYER_PUSH_INTERVAL_TICKS);
+
+        banTask = Bukkit.getScheduler().runTaskTimerAsynchronously(
+                plugin, this::liftExpiredBans, BAN_CHECK_INTERVAL_TICKS, BAN_CHECK_INTERVAL_TICKS);
     }
 
     private void cancelTasks() {
@@ -293,6 +409,28 @@ public final class PanelManager {
             logTask.cancel();
             logTask = null;
         }
+        if (playerTask != null) {
+            playerTask.cancel();
+            playerTask = null;
+        }
+        if (banTask != null) {
+            banTask.cancel();
+            banTask = null;
+        }
+    }
+
+    /**
+     * 高频推送在线玩家，供玩家列表与传送弹窗实时刷新。
+     */
+    private void pushPlayers() {
+        if (webSocketHub.isEmpty()) {
+            return;
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("type", "players");
+        payload.put("players", playerService.listOnline());
+        webSocketHub.broadcast(JsonUtil.toJson(payload));
     }
 
     /**
@@ -335,6 +473,18 @@ public final class PanelManager {
         payload.put("type", "status");
         payload.put("data", status);
         webSocketHub.broadcast(JsonUtil.toJson(payload));
+    }
+
+    /**
+     * 解除到期的临时封禁。
+     *
+     * <p>跑在异步线程上：读存储是阻塞 IO，切主线程执行解除动作由
+     * {@link BanService} 自己负责。
+     */
+    private void liftExpiredBans() {
+        if (banService != null) {
+            banService.liftExpired();
+        }
     }
 
     private void runMaintenance() {

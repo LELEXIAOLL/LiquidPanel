@@ -48,6 +48,14 @@
     <path d="M12 21a9 9 0 1 1 9-9"/>
     <path d="M12 12l4.5-3.5"/>
   </symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+  </symbol>
   <symbol id="i-send" viewBox="0 0 24 24">
     <line x1="22" y1="2" x2="11" y2="13"/>
     <polygon points="22 2 15 22 11 13 2 9 22 2"/>
@@ -80,6 +88,18 @@
     <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-console" data-tab="console">
       <svg class="icon" aria-hidden="true"><use href="#i-terminal"></use></svg>
       <span>控制台</span>
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-files" data-tab="files">
+      <svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>
+      <span>文件管理</span>
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-players" data-tab="players">
+      <svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg>
+      <span>玩家管理</span>
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-settings" data-tab="settings">
+      <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
+      <span>设置</span>
     </button>
   </nav>
 
@@ -267,7 +287,7 @@
             <circle class="ring__value" cx="60" cy="60" r="52" id="disk-ring"/>
           </svg>
           <div class="ring__center">
-            <span class="ring__percent"><span class="num" id="disk-percent">--</span><small>%</small></span>
+            <span class="ring__percent"><span class="num" id="disk-size">--</span><small id="disk-size-unit"></small></span>
             <span class="ring__detail" id="disk-detail">--</span>
           </div>
         </div>
@@ -341,6 +361,219 @@
       <p class="console-hint" id="command-hint">以控制台身份执行，等同于直接在服务端控制台输入。上下方向键可翻历史。</p>
     </article>
 
+
+
+  </main>
+
+  <main class="content" id="panel-files" role="tabpanel" hidden>
+
+    <article class="card files-card">
+      <header class="card__head">
+        <svg class="icon card__icon" aria-hidden="true"><use href="#i-folder"></use></svg>
+        <h2 class="card__title">文件管理</h2>
+        <span class="files-hint">根目录：<span id="files-root">--</span></span>
+      </header>
+
+      <!-- 面包屑 -->
+      <nav class="crumbs" id="files-crumbs" aria-label="路径"></nav>
+
+      <!-- 操作栏 -->
+      <div class="files-bar">
+        <button class="btn-mini" type="button" data-cmd="refresh">刷新</button>
+        <button class="btn-mini" type="button" data-cmd="mkdir">新建文件夹</button>
+        <button class="btn-mini" type="button" data-cmd="newfile">新建文件</button>
+        <button class="btn-mini" type="button" data-cmd="upload">上传文件</button>
+
+        <span class="files-bar__spacer"></span>
+
+        <span class="files-count" id="files-count">未选择</span>
+        <button class="btn-mini" type="button" data-cmd="copy">复制</button>
+        <button class="btn-mini" type="button" data-cmd="cut">剪切</button>
+        <button class="btn-mini" type="button" data-cmd="paste">粘贴</button>
+        <button class="btn-mini" type="button" data-cmd="edit">编辑</button>
+        <button class="btn-mini" type="button" data-cmd="rename">重命名</button>
+        <button class="btn-mini" type="button" data-cmd="compress">压缩</button>
+        <button class="btn-mini" type="button" data-cmd="extract">解压</button>
+        <button class="btn-mini btn-mini--danger" type="button" data-cmd="delete">删除</button>
+      </div>
+
+      <!-- 列表表头 -->
+      <div class="files-head">
+        <span class="files-col files-col--check">
+          <input type="checkbox" id="files-check-all" aria-label="全选">
+        </span>
+        <span class="files-col files-col--name">名称</span>
+        <span class="files-col files-col--size">大小</span>
+        <span class="files-col files-col--time">修改时间</span>
+        <span class="files-col files-col--ops">操作</span>
+      </div>
+
+      <div class="upload" id="files-progress" hidden>
+        <div class="upload__bar"><div class="upload__fill" id="files-progress-fill"></div></div>
+        <span class="upload__text" id="files-progress-text"></span>
+      </div>
+
+      <div class="files-list" id="files-list" role="listbox" aria-multiselectable="true"></div>
+      <p class="files-status" id="files-status">加载中...</p>
+    </article>
+
+    <input type="file" id="files-upload-input" multiple hidden>
+
+  </main>
+
+  <!-- 玩家管理：先占位，内容之后再补 -->
+  <main class="content" id="panel-players" role="tabpanel" hidden>
+
+    <article class="card">
+      <header class="card__head">
+        <svg class="icon card__icon" aria-hidden="true"><use href="#i-users"></use></svg>
+        <h2 class="card__title">玩家</h2>
+
+        <!-- 筛选：选项由后端给，前端照着渲染 -->
+        <div class="dropdown dropdown--inline" id="player-filter-dropdown">
+          <button type="button" class="dropdown__button" id="player-filter-button"
+                  aria-haspopup="listbox" aria-expanded="false">
+            <span class="dropdown__value" id="player-filter-value">--</span>
+            <span class="dropdown__arrow" aria-hidden="true"></span>
+          </button>
+          <ul class="dropdown__menu" id="player-filter-menu" role="listbox" hidden></ul>
+        </div>
+
+        <span class="settings-current">共 <span id="players-total">--</span> 人</span>
+        <button class="btn-mini" type="button" data-pcmd="refresh">刷新</button>
+      </header>
+
+      <div class="player-list" id="player-list"></div>
+      <p class="files-status" id="players-status"></p>
+
+      <nav class="pager" id="players-pager" hidden aria-label="分页">
+        <button class="btn-mini" type="button" data-pcmd="prev">上一页</button>
+        <span class="pager__info" id="players-page-info">--</span>
+        <button class="btn-mini" type="button" data-pcmd="next">下一页</button>
+      </nav>
+    </article>
+
+  </main>
+
+  <!-- 设置 -->
+  <main class="content" id="panel-settings" role="tabpanel" hidden>
+
+    <article class="card">
+      <header class="card__head">
+        <svg class="icon card__icon" aria-hidden="true"><use href="#i-settings"></use></svg>
+        <h2 class="card__title">面板账户</h2>
+        <span class="settings-current">当前账号：<span id="settings-current-user">--</span></span>
+      </header>
+
+      <p class="settings-note">
+        修改后<b>所有登录状态都会失效</b>，需要用新账号重新登录。
+        用户名与密码都会一并保存。
+      </p>
+
+      <form id="settings-form" class="settings-form">
+        <!-- 四个输入框排一行 -->
+        <div class="settings-row">
+          <label class="field">
+            <span>新的用户名</span>
+            <input id="settings-username" type="text" autocomplete="username" spellcheck="false">
+          </label>
+
+          <label class="field">
+            <span>当前密码</span>
+            <input id="settings-old" type="password" autocomplete="current-password">
+          </label>
+
+          <label class="field">
+            <span>新的密码</span>
+            <input id="settings-password" type="password" autocomplete="new-password">
+          </label>
+
+          <label class="field">
+            <span>再次确认新密码</span>
+            <input id="settings-confirm" type="password" autocomplete="new-password">
+          </label>
+        </div>
+
+        <p class="modal__error" id="settings-error" hidden></p>
+
+        <button type="submit" class="btn-run btn-run--inline" id="settings-submit">保存修改</button>
+      </form>
+    </article>
+
+    <article class="card">
+      <header class="card__head">
+        <svg class="icon card__icon" aria-hidden="true"><use href="#i-users"></use></svg>
+        <h2 class="card__title">玩家管理</h2>
+      </header>
+
+      <label class="field settings-field">
+        <span>每页显示数量</span>
+        <input id="settings-page-size" type="number" min="1" max="100" step="1">
+      </label>
+      <p class="settings-hint" id="settings-page-hint">修改后立即保存到 panelconfig.json</p>
+    </article>
+
+    <article class="card">
+      <header class="card__head">
+        <svg class="icon card__icon" aria-hidden="true"><use href="#i-activity"></use></svg>
+        <h2 class="card__title">兼容性设置</h2>
+      </header>
+
+      <p class="settings-note">
+        面板不自己实现封禁，而是决定把封禁动作交给谁执行。
+        服务器上装了封禁插件的话，在这里切过去，玩家管理页的封禁按钮就会走那个插件。
+      </p>
+
+      <div class="field settings-field">
+        <span>封禁方式</span>
+        <!-- 自定义下拉框：原生 select 的展开列表由系统绘制，改不动样式 -->
+        <div class="dropdown" id="ban-method-dropdown">
+          <button type="button" class="dropdown__button" id="ban-method-button"
+                  aria-haspopup="listbox" aria-expanded="false">
+            <span class="dropdown__value" id="ban-method-value">--</span>
+            <span class="dropdown__arrow" aria-hidden="true"></span>
+          </button>
+          <ul class="dropdown__menu" id="ban-method-menu" role="listbox" hidden></ul>
+        </div>
+      </div>
+      <p class="settings-hint" id="settings-ban-hint">修改后立即保存到 panelconfig.json</p>
+
+      <!-- 经济是另一码事，和封禁方式隔开 -->
+      <label class="switch-row">
+        <input type="checkbox" id="settings-vault">
+        <span class="toggle" aria-hidden="true"></span>
+        <span>接入 Vault 经济</span>
+      </label>
+      <!-- 平时不占位，只有「开了却接不上」时才有话要说 -->
+      <p class="settings-hint" id="settings-vault-hint" hidden></p>
+
+      <!-- 只有选 CustomCommand 时才用得上 -->
+      <div class="settings-commands" id="settings-ban-commands" hidden>
+        <p class="settings-note">
+          以控制台身份执行，可用占位符：
+          <code>%player%</code> <code>%reason%</code> <code>%time%</code>。
+          永久封禁时 <code>%time%</code> 会替换成空。
+        </p>
+
+        <div class="settings-row">
+          <label class="field settings-field settings-command">
+            <span>临时封禁命令</span>
+            <input id="settings-ban-command-temp" type="text" spellcheck="false" autocomplete="off">
+          </label>
+
+          <label class="field settings-field settings-command">
+            <span>永久封禁命令</span>
+            <input id="settings-ban-command-perm" type="text" spellcheck="false" autocomplete="off">
+          </label>
+
+          <label class="field settings-field settings-command">
+            <span>到期解封命令</span>
+            <input id="settings-ban-command-unban" type="text" spellcheck="false" autocomplete="off">
+          </label>
+        </div>
+      </div>
+    </article>
+
   </main>
 
   </div>
@@ -373,6 +606,107 @@
       <p class="modal__error" id="setup-error" hidden></p>
       <button type="submit" class="btn-run" id="setup-submit">修改</button>
     </form>
+  </div>
+</div>
+
+
+<!-- 文本编辑器 -->
+<div class="modal" id="editor-modal" hidden>
+  <div class="modal__backdrop" id="editor-backdrop"></div>
+  <div class="modal__panel modal__panel--wide" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+    <h2 class="modal__title" id="editor-title">编辑文件</h2>
+    <p class="modal__desc" id="editor-path"></p>
+
+    <p class="modal__error" id="editor-warning" hidden></p>
+
+    <textarea id="editor-content" spellcheck="false" wrap="off"
+              aria-label="文件内容"></textarea>
+
+    <p class="modal__error" id="editor-error" hidden></p>
+
+    <div class="modal__buttons">
+      <span class="editor-meta" id="editor-meta"></span>
+      <button type="button" class="btn-ghost" id="editor-cancel">关闭</button>
+      <button type="button" class="btn-run" id="editor-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 右下角通知 -->
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<!-- 文件操作弹窗（可取消） -->
+<div class="modal" id="file-modal" hidden>
+  <div class="modal__backdrop" id="file-modal-backdrop"></div>
+  <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="file-modal-title">
+    <h2 class="modal__title" id="file-modal-title">操作</h2>
+    <p class="modal__desc" id="file-modal-desc"></p>
+
+    <label class="field" id="file-modal-field">
+      <span id="file-modal-label">名称</span>
+      <input id="file-modal-input" type="text" autocomplete="off" spellcheck="false">
+    </label>
+
+    <div class="format-choice" id="file-modal-format" hidden>
+      <label><input type="radio" name="archive-format" value="zip" checked> zip</label>
+      <label><input type="radio" name="archive-format" value="7z"> 7z</label>
+    </div>
+
+    <!-- 通用选项卡（选项由调用方给），例如「存入 / 扣除 / 设为」 -->
+    <div class="format-choice" id="file-modal-choices" hidden></div>
+
+    <p class="modal__live" id="file-modal-live" hidden></p>
+
+    <!-- 临时封禁：只在封禁弹窗里出现 -->
+    <div class="tempban" id="file-modal-tempban" hidden>
+      <div class="tempban__head">
+        <label class="tempban__switch">
+          <input type="checkbox" id="tempban-toggle">
+          <span>临时封禁</span>
+        </label>
+        <span class="tempban__note">关闭时为永久封禁</span>
+      </div>
+
+      <div class="tempban__grid" id="tempban-fields" hidden>
+        <label class="tempban__field">
+          <span>年</span>
+          <input type="number" id="tempban-years" min="0" step="1" value="0">
+        </label>
+        <label class="tempban__field">
+          <span>月</span>
+          <input type="number" id="tempban-months" min="0" step="1" value="0">
+        </label>
+        <label class="tempban__field">
+          <span>周</span>
+          <input type="number" id="tempban-weeks" min="0" step="1" value="0">
+        </label>
+        <label class="tempban__field">
+          <span>天</span>
+          <input type="number" id="tempban-days" min="0" step="1" value="0">
+        </label>
+        <label class="tempban__field">
+          <span>时</span>
+          <input type="number" id="tempban-hours" min="0" step="1" value="0">
+        </label>
+        <label class="tempban__field">
+          <span>分</span>
+          <input type="number" id="tempban-minutes" min="0" step="1" value="0">
+        </label>
+        <label class="tempban__field">
+          <span>秒</span>
+          <input type="number" id="tempban-seconds" min="0" step="1" value="0">
+        </label>
+      </div>
+
+      <p class="tempban__preview" id="tempban-preview" hidden></p>
+    </div>
+
+    <p class="modal__error" id="file-modal-error" hidden></p>
+
+    <div class="modal__buttons">
+      <button type="button" class="btn-ghost" id="file-modal-cancel">取消</button>
+      <button type="button" class="btn-run" id="file-modal-ok">确定</button>
+    </div>
   </div>
 </div>
 

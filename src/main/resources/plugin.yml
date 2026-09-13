@@ -5,6 +5,15 @@ api-version: '1.21'
 load: STARTUP
 authors: [ LELEXIAOLL ]
 
+# Vault 是软依赖：装了就用它的经济接口，没装就当没这功能。
+#
+# 这一行是必须的 —— 面板里引用 Vault 类型的那个类，要靠它才能在自己的
+# 类加载器里解析到 Vault 的类。少了这行，装了 Vault 也接不上。
+#
+# 注意本插件是 STARTUP 加载，Vault 是 POSTWORLD，我们 enable 的时候
+# Vault 还没起来，所以经济探测是「隔一会儿重试」而不是「只探一次」。
+softdepend: [ Vault ]
+
 commands:
   liquidpanel:
     description: LiquidPanel 主命令

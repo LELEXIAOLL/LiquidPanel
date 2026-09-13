@@ -10,6 +10,7 @@ import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -49,7 +50,12 @@ public final class HttpUtil {
             "default-src 'self'; "
             + "script-src 'self'; "
             + "style-src 'self' 'unsafe-inline'; "
-            + "img-src 'self' data:; "
+            // 玩家头像由浏览器直接加载（走管理员自己的网络）：
+            //   textures.minecraft.net —— Mojang 官方贴图，有皮肤时优先用
+            //   mc-heads.net / minotar.net —— 按玩家名直接取正版头像，
+            //     离线模式下也能用（Mojang 的 Profile 里没有贴图，只能靠名字去查）
+            // 只放开这三个图片域名，脚本与样式仍然只允许同源。
+            + "img-src 'self' data: https://textures.minecraft.net https://mc-heads.net https://minotar.net; "
             + "font-src 'self'; "
             + "connect-src 'self' ws: wss:; "
             + "frame-ancestors 'none'; "
@@ -201,6 +207,30 @@ public final class HttpUtil {
     }
 
     /**
+     * 解析查询串。出错的参数原样保留，不抛异常。
+     */
+    public static Map<String, String> parseQuery(String queryString) {
+        Map<String, String> params = new HashMap<>();
+        if (queryString == null || queryString.isEmpty()) {
+            return params;
+        }
+        for (String pair : queryString.split("&")) {
+            int index = pair.indexOf('=');
+            if (index <= 0) {
+                continue;
+            }
+            try {
+                params.put(URLDecoder.decode(pair.substring(0, index), StandardCharsets.UTF_8),
+                        URLDecoder.decode(pair.substring(index + 1), StandardCharsets.UTF_8));
+            } catch (RuntimeException e) {
+                // 百分号编码有问题就按原文存，不因为一个参数把整个请求打回
+                params.put(pair.substring(0, index), pair.substring(index + 1));
+            }
+        }
+        return params;
+    }
+
+    /**
      * 取来源 IP。直接取 TCP 连接地址，不信任 X-Forwarded-For，避免伪造 IP 绕过登录限制。
      */
     public static String clientIp(HttpServerExchange exchange) {
@@ -288,6 +318,13 @@ public final class HttpUtil {
 
     /**
      * 要求已登录，未登录时自动回 401。
+     *
+     * <p><b>约定：面板内需要登录的接口，401 一律只表示「会话无效」。</b>
+     * 前端对 401 的处理是直接跳登录页，所以任何「已登录但不该做这件事」的错误
+     * （比如旧密码不正确）都必须用 403，否则用户只是输错一次密码就会被踢出去。
+     *
+     * <p>登录接口自己是例外：那里还没有会话，401 就是标准的「凭据不对」，
+     * 而且它的调用方是登录页，不套用上面这条跳转规则。
      */
     public static PanelSession requireSession(HttpServerExchange exchange, SessionManager sessionManager) {
         PanelSession session = resolveSession(exchange, sessionManager);

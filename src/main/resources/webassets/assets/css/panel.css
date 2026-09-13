@@ -550,20 +550,17 @@ body::after {
     transition: opacity 0.3s var(--ease);
 }
 
-.chart__line[data-line="cpu"],
-.chart__line[data-line="mem"] {
-    stroke: var(--series-process);
-}
+/*
+  曲线颜色跟着系列定义走，不在这里按 data-line 逐个枚举。
 
-.chart__line[data-line="cpuAll"],
-.chart__line[data-line="memAll"],
-.chart__line[data-line="tps5"] {
-    stroke: var(--series-machine);
-}
-
-.chart__line[data-line="tps15"] {
-    stroke: var(--series-third);
-}
+  踩过的坑：原来是 .chart__line[data-line="cpu"] 这样一条条列的，
+  新增系列时漏写了 tps1 与 players，而 SVG 默认 stroke 是 none ——
+  没有匹配到规则的线直接是透明的，看起来就像"这条曲线不显示"。
+  改成按系列自己的 swatch 上色，加系列时只要 CSS 里有这三档颜色就一定能画出来。
+*/
+.chart__line.swatch--process { stroke: var(--series-process); }
+.chart__line.swatch--machine { stroke: var(--series-machine); }
+.chart__line.swatch--third { stroke: var(--series-third); }
 
 .chart__hair {
     stroke: var(--line);
@@ -577,20 +574,9 @@ body::after {
     stroke-width: 2;
 }
 
-.chart__dot[data-dot="cpu"],
-.chart__dot[data-dot="mem"] {
-    fill: var(--series-process);
-}
-
-.chart__dot[data-dot="cpuAll"],
-.chart__dot[data-dot="memAll"],
-.chart__dot[data-dot="tps5"] {
-    fill: var(--series-machine);
-}
-
-.chart__dot[data-dot="tps15"] {
-    fill: var(--series-third);
-}
+.chart__dot.swatch--process { fill: var(--series-process); }
+.chart__dot.swatch--machine { fill: var(--series-machine); }
+.chart__dot.swatch--third { fill: var(--series-third); }
 
 .chart__tooltip {
     position: absolute;
@@ -1036,6 +1022,17 @@ body::after {
     box-shadow: 0 0 0 3px rgba(85, 184, 223, 0.2);
 }
 
+.modal__live {
+    margin: 0 0 14px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    background: rgba(169, 217, 235, 0.22);
+    color: var(--blue-dark);
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+}
+
 .modal__error {
     margin: 0 0 14px;
     padding: 9px 12px;
@@ -1049,6 +1046,978 @@ body::after {
 .modal .btn-run {
     width: 100%;
     margin-top: 4px;
+}
+
+
+/* ---------- 文件管理 ---------- */
+
+.files-hint {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 11.5px;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 50%;
+}
+
+.crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    background: rgba(169, 217, 235, 0.18);
+    font-size: 12.5px;
+}
+
+.crumb {
+    padding: 2px 7px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--blue-dark);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s var(--ease);
+}
+
+.crumb:hover { background: rgba(255, 255, 255, 0.75); }
+.crumb.is-current { color: var(--muted); cursor: default; }
+.crumb.is-current:hover { background: transparent; }
+
+.crumb-sep { color: var(--line); font-weight: 700; }
+
+.files-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.files-bar__spacer { flex: 1; }
+
+.files-count {
+    margin-right: 4px;
+    color: var(--muted);
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.btn-mini {
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--blue-dark);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.25s var(--ease), border-color 0.25s var(--ease),
+                color 0.25s var(--ease), transform 0.25s var(--ease);
+}
+
+.btn-mini:hover:not(:disabled) {
+    background: var(--white);
+    border-color: var(--blue);
+    transform: translateY(-1px);
+}
+
+.btn-mini:active:not(:disabled) { transform: translateY(1px); }
+
+.btn-mini:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-mini--danger { color: var(--danger); }
+.btn-mini--danger:hover:not(:disabled) { border-color: var(--danger); }
+
+.btn-mini--ok { color: var(--ok); }
+.btn-mini--ok:hover:not(:disabled) { border-color: var(--ok); }
+
+/* 列表 */
+.files-head,
+.file-row {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 3fr) 90px 140px 78px;
+    align-items: center;
+    gap: 8px;
+}
+
+.files-head {
+    padding: 0 10px 6px;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.files-list {
+    max-height: 460px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.file-row {
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    animation: rise 0.28s var(--ease) backwards;
+    transition: background 0.2s var(--ease);
+}
+
+.file-row:hover { background: rgba(169, 217, 235, 0.2); }
+
+.file-row.is-selected {
+    background: rgba(85, 184, 223, 0.2);
+    box-shadow: inset 2px 0 0 var(--blue-dark);
+}
+
+.files-col--check { display: flex; align-items: center; }
+.files-col--size,
+.files-col--time {
+    color: var(--muted);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.files-col--ops { text-align: right; }
+
+.file-name {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink-strong);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    padding: 0;
+    cursor: pointer;
+}
+
+.file-name span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-name:hover span { text-decoration: underline; }
+
+.file-name .icon {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+    color: var(--blue);
+}
+
+.file-name.is-dir { font-weight: 700; }
+
+/* 不能用文本编辑器打开的，弱化一档并去掉可点的暗示 */
+.file-name.is-locked { cursor: default; }
+
+.file-name.is-locked .icon { color: var(--muted); }
+
+.file-name.is-locked:hover span { text-decoration: none; }
+
+.file-op {
+    padding: 3px 9px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.7);
+    color: var(--blue-dark);
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.file-op:hover { background: var(--white); border-color: var(--blue); }
+
+.files-status {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.files-status.is-error { color: var(--danger); }
+.files-status.is-ok { color: var(--ok); }
+
+/* 弹窗里的格式选择与按钮行 */
+.format-choice {
+    display: flex;
+    gap: 18px;
+    margin-bottom: 16px;
+    color: var(--ink-strong);
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+.format-choice label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+/* ---------- 弹窗里的临时封禁 ---------- */
+
+.tempban {
+    margin: 14px 0 4px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: rgba(85, 184, 223, 0.07);
+}
+
+.tempban__switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink-strong);
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.tempban__switch input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--blue);
+    cursor: pointer;
+}
+
+/*
+ * 开关和右边的说明文字排成一行，用 flex 对齐。
+ * 原来靠 inline-flex 和 inline 混排，两者的基线不一样，
+ * 说明文字会明显比开关低一截。
+ */
+.tempban__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tempban__note {
+    color: var(--muted);
+    font-size: 12.5px;
+}
+
+/* 年月周天时分秒。窄屏会自动折成两行 */
+.tempban__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(62px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.tempban__field span {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+.tempban__field input {
+    width: 100%;
+    padding: 8px 4px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--ink-strong);
+    font: inherit;
+    font-size: 14px;
+    text-align: center;
+    /* 格子只有 60 多像素宽，转动箭头会占掉一半，直接去掉 */
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.tempban__field input::-webkit-outer-spin-button,
+.tempban__field input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.tempban__field input:focus {
+    outline: none;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(85, 184, 223, 0.2);
+}
+
+.tempban__preview {
+    margin: 10px 0 0;
+    color: var(--blue);
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+.tempban__preview.is-warning {
+    color: var(--danger);
+}
+
+.modal__buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.modal__buttons .btn-ghost { flex: 0 0 auto; padding: 10px 20px; }
+.modal__buttons .btn-run { flex: 1; width: auto; margin-top: 0; }
+
+/* ---------- 上传进度 ---------- */
+
+.upload {
+    margin-bottom: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    background: rgba(169, 217, 235, 0.2);
+    animation: rise 0.25s var(--ease) backwards;
+}
+
+.upload__bar {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.7);
+    overflow: hidden;
+}
+
+.upload__fill {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--blue), var(--blue-dark));
+    transition: width 0.25s var(--ease);
+}
+
+.upload__text {
+    display: block;
+    margin-top: 7px;
+    color: var(--blue-dark);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* ---------- 文本编辑器 ---------- */
+
+/* 编辑器几乎铺满整屏：面板本身定高，文本域用 flex 吃掉剩余空间 */
+.modal__panel--wide {
+    display: flex;
+    flex-direction: column;
+    width: min(96vw, 1700px);
+    height: min(94vh, 1400px);
+    padding: 22px 26px 18px;
+}
+
+#editor-content {
+    flex: 1;
+    /* flex 子项的默认最小高度是「内容高度」，必须归零才能真正被压缩并撑满 */
+    min-height: 0;
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: #12181d;
+    color: #cfdde7;
+    caret-color: var(--blue);
+    font-family: "Cascadia Mono", Consolas, "Sarasa Mono SC", "Microsoft YaHei Mono", monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    tab-size: 4;
+    white-space: pre;
+    overflow: auto;
+}
+
+#editor-content:focus {
+    outline: none;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(85, 184, 223, 0.2);
+}
+
+.editor-meta {
+    flex: 1;
+    color: var(--muted);
+    font-size: 11.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 右下角通知 ---------- */
+
+.toasts {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+    pointer-events: none;
+}
+
+.toast {
+    max-width: 320px;
+    padding: 10px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 12px 32px rgba(2, 37, 61, 0.2);
+    color: var(--ink-strong);
+    font-size: 13px;
+    font-weight: 600;
+    animation: toastIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.toast--ok { border-color: rgba(63, 174, 125, 0.45); color: #2f8f68; }
+.toast--error { border-color: rgba(217, 117, 124, 0.45); color: #b3545c; }
+
+.toast--out {
+    animation: toastOut 0.24s ease-in both;
+}
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.97); }
+    to   { opacity: 1; transform: none; }
+}
+
+@keyframes toastOut {
+    from { opacity: 1; transform: none; }
+    to   { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+
+/* ---------- 占位（玩家管理等尚未完成的选项卡） ---------- */
+
+.placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 56px 20px;
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+    background: rgba(169, 217, 235, 0.12);
+}
+
+.placeholder__icon {
+    width: 42px;
+    height: 42px;
+    color: var(--line);
+}
+
+.placeholder__text {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13.5px;
+}
+
+/* ---------- 设置 ---------- */
+
+.settings-current {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.settings-current span {
+    color: var(--blue-dark);
+    font-weight: 700;
+}
+
+.settings-note {
+    margin: 0 0 22px;
+    padding: 11px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(224, 161, 58, 0.35);
+    background: rgba(224, 161, 58, 0.1);
+    color: #9a7028;
+    font-size: 12.5px;
+    line-height: 1.65;
+}
+
+/* 账号的四个输入框排成一行，窄屏自动折行 */
+.settings-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0 16px;
+}
+
+.settings-form {
+    max-width: 100%;
+}
+
+/* 单列设置项，不要撑满整行 */
+.settings-field {
+    display: block;
+    max-width: 260px;
+    margin-bottom: 10px;
+}
+
+.settings-field span {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+.settings-field input,
+.settings-field select {
+    width: 100%;
+    padding: 10px 13px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--ink-strong);
+    font: inherit;
+    font-size: 14px;
+    transition: border-color 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+
+.settings-field select {
+    cursor: pointer;
+}
+
+.settings-field input:focus,
+.settings-field select:focus {
+    outline: none;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(85, 184, 223, 0.2);
+}
+
+/* 自定义封禁命令：只在封禁方式选了 CustomCommand 时出现 */
+.settings-commands {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--line);
+    animation: rise 0.3s var(--ease) both;
+}
+
+.settings-commands code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(85, 184, 223, 0.16);
+    color: var(--ink-strong);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+}
+
+/* 开关行：滑块开关 + 标签。与上面的设置项用虚线隔开 */
+.switch-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 260px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--line);
+    color: var(--ink-strong);
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/*
+ * 真正的勾选框藏起来，滑块是画出来的。
+ * 不用 display:none —— 那样它就没法被 Tab 聚焦、空格也切换不了，
+ * 键盘用户就操作不到这个开关了。
+ */
+.switch-row input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.toggle {
+    position: relative;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(106, 155, 178, 0.42);
+    transition: background 0.3s var(--ease);
+}
+
+.toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(31, 66, 88, 0.28);
+    transition: transform 0.3s var(--ease);
+}
+
+.switch-row input:checked + .toggle {
+    background: var(--blue);
+}
+
+.switch-row input:checked + .toggle::after {
+    transform: translateX(18px);
+}
+
+/* 键盘聚焦时给个看得见的提示 */
+.switch-row input:focus-visible + .toggle {
+    box-shadow: 0 0 0 3px rgba(85, 184, 223, 0.28);
+}
+
+/* 命令模板比常规设置项长，让它占满整列 */
+.settings-command {
+    max-width: 100%;
+}
+
+.settings-command input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+}
+
+/* ---------- 自定义下拉框 ---------- */
+
+.dropdown {
+    position: relative;
+}
+
+.dropdown__button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 13px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--ink-strong);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+
+.dropdown__button:focus-visible,
+.dropdown__button.is-open {
+    outline: none;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(85, 184, 223, 0.2);
+}
+
+/* 用边框画的小三角，省一个图标 */
+.dropdown__arrow {
+    flex: 0 0 auto;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--muted);
+    transition: transform 0.25s var(--ease);
+}
+
+.dropdown__button.is-open .dropdown__arrow {
+    transform: rotate(180deg);
+}
+
+/*
+ * 菜单挂在 body 下（见 createDropdown），所以是 fixed 定位，
+ * top / left / width 全部由 JS 按按钮的实际位置算。
+ *
+ * 不能留在卡片里用 absolute：卡片有 overflow: hidden 会把它裁掉，
+ * 而卡片的 backdrop-filter 又会让它成为 fixed 定位的包含块 ——
+ * 也就是说改成 fixed 也逃不出卡片，只能搬出去。
+ */
+.dropdown__menu {
+    position: fixed;
+    z-index: 20;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(31, 66, 88, 0.16);
+    animation: rise 0.2s var(--ease) both;
+}
+
+.dropdown__option {
+    padding: 9px 11px;
+    border-radius: var(--radius-sm);
+    color: var(--ink-strong);
+    font-size: 13.5px;
+    cursor: pointer;
+    transition: background 0.2s var(--ease);
+}
+
+.dropdown__option:hover {
+    background: rgba(85, 184, 223, 0.14);
+}
+
+.dropdown__option[aria-selected="true"] {
+    background: rgba(85, 184, 223, 0.22);
+    font-weight: 700;
+}
+
+/* 卡片头上那个小号的，宽度跟着内容走，不占满一行 */
+.dropdown--inline {
+    flex: 0 0 auto;
+}
+
+.dropdown--inline .dropdown__button {
+    width: auto;
+    min-width: 116px;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+/* 保存按钮另起一行，靠左 */
+.btn-run--inline {
+    width: auto;
+    padding: 10px 26px;
+    margin-top: 6px;
+}
+
+.settings-form .field {
+    display: block;
+    margin-bottom: 14px;
+}
+
+.settings-form .field span {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+.settings-form .field input {
+    width: 100%;
+    padding: 10px 13px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--ink-strong);
+    font: inherit;
+    font-size: 14px;
+    transition: border-color 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+
+.settings-form .field input:focus {
+    outline: none;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(85, 184, 223, 0.2);
+}
+
+.settings-form .btn-run {
+    width: 100%;
+    margin-top: 4px;
+}
+
+/* ---------- 玩家管理 ---------- */
+
+.player-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.player-row {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 180px auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    animation: rise 0.28s var(--ease) backwards;
+    transition: background 0.2s var(--ease);
+}
+
+.player-row:hover { background: rgba(169, 217, 235, 0.18); }
+
+/* 头像：把 64×64 的皮肤放大 5 倍，再用 overflow 裁出头那 8×8 像素 */
+.player-head {
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    border-radius: 7px;
+    background: rgba(169, 217, 235, 0.25);
+    flex: 0 0 auto;
+}
+
+/* 默认：拿到的就是裁好的头部图，直接铺满 */
+.player-head img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+}
+
+/*
+  整张 64×64 皮肤（Mojang 官方贴图就是这种）：
+  放大 5 倍成 320px，再用负边距把头那 8×8 像素挪进 40px 的框里。
+*/
+.player-head img.is-full-skin {
+    width: 320px;
+    height: 320px;
+    margin-left: -40px;
+    margin-top: -40px;
+}
+
+.player-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* 名字和封禁标记排一行，下面对齐的是 uuid */
+.player-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.player-flag {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(217, 117, 124, 0.18);
+    color: var(--danger);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.player-name {
+    color: var(--ink-strong);
+    font-size: 13.5px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.player-uuid {
+    color: var(--muted);
+    font-size: 11px;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.player-pos {
+    color: var(--blue-dark);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.player-ops {
+    display: flex;
+    gap: 5px;
+    justify-content: flex-end;
+}
+
+/* ---------- 生存状态 ---------- */
+
+.player-vitals {
+    display: flex;
+    align-items: baseline;
+    gap: 13px;
+    color: var(--ink-strong);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.vital {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+}
+
+.vital__label {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.vital i {
+    color: var(--muted);
+    font-size: 11px;
+    font-style: normal;
+}
+
+/* 金心（伤害吸收）用金色，跟真实血量区分开 */
+.vital i.is-absorption {
+    color: var(--warn);
+    font-weight: 700;
+}
+
+/* 血量掉到三成以下时数字标红，扫一眼就知道谁快没了 */
+.vital.is-low b { color: var(--danger); }
+
+/* ---------- 分页 ---------- */
+
+.pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.pager__info {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 设置分隔 ---------- */
+
+.settings-divider {
+    margin: 22px 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+}
+
+.settings-hint {
+    /*
+     * 负的上边距是给输入框配的：输入框自带 10px 下边距，
+     * 拉近一点才不至于离它的说明太远。
+     */
+    margin: -6px 0 0;
+    color: var(--muted);
+    font-size: 11.5px;
+}
+
+/*
+ * 但开关行没有那 10px 的下边距，负值会直接把提示拽到开关上贴住。
+ * 这里还原成正的间距。
+ */
+.switch-row + .settings-hint {
+    margin-top: 8px;
 }
 
 /* ---------- 首屏骨架 ---------- */
@@ -1102,6 +2071,24 @@ body.is-pending .num {
 
     .log {
         height: 360px;
+    }
+
+    .files-head,
+    .file-row {
+        grid-template-columns: 30px minmax(0, 1fr) 70px;
+    }
+
+    .player-row {
+        grid-template-columns: 42px minmax(0, 1fr);
+    }
+
+    .player-pos {
+        display: none;
+    }
+
+    .files-col--time,
+    .files-col--ops {
+        display: none;
     }
 
     .brand  { grid-column: 1; grid-row: 1; }

@@ -216,11 +216,19 @@ public final class WebAssetManager {
     }
 
     /**
-     * 静态资源的缓存策略：HTML 不缓存（保证前端更新后立刻生效），
-     * 其余资源短缓存。资源文件名带版本号时可以再放宽。
+     * 静态资源一律不缓存。
+     *
+     * <p>这里曾经给 JS / CSS 设过 5 分钟缓存，结果每次更新插件都会踩一次坑：
+     * HTML 不缓存所以拿到新版、JS 却还是旧的，两边对不上。
+     * 最典型的是新增选项卡 —— 新 HTML 有按钮，旧 JS 不认识那个面板，
+     * 点下去会把所有面板都藏掉，整个内容区变成空白。
+     *
+     * <p>要恢复缓存必须先给资源 URL 带上版本号（否则缓存键永远不变），
+     * 在那之前「每次都回源」是唯一正确的选择。面板资源总共几十 KB，
+     * 又是自用的管理后台，这点开销比界面出错划算得多。
      */
     public String cacheControl(String path) {
-        return path.endsWith(".html") ? "no-cache" : "public, max-age=300";
+        return "no-cache";
     }
 
     /**
