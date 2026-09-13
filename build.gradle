@@ -8,9 +8,17 @@ version = '1.0'
 
 repositories {
     mavenCentral()
+
     maven {
         name = "spigotmc-repo"
         url = "https://hub.spigotmc.org/nexus/content/repositories/snapshots/"
+    }
+
+    // Vault 的 API。它不在 Maven Central 上，JitPack 上虽然也有一份，
+    // 但国内拉取基本不通；CodeMC 是 Vault 官方发布的地方，实测可达。
+    maven {
+        name = "codemc"
+        url = "https://repo.codemc.io/repository/maven-public/"
     }
 }
 
@@ -24,15 +32,12 @@ dependencies {
     // 所以直接引用 log4j-core。服务端自带，用 compileOnly 不打进插件。
     compileOnly("org.apache.logging.log4j:log4j-core:2.24.1")
 
-    // Vault 经济 API。只在编译期用，不打进 jar —— 运行期由服务端上装的 Vault 插件提供。
-    //
-    // 不用 Maven 坐标：VaultAPI 只发布在 JitPack 上，国内拉取不稳，
-    // 直接引用仓库里这份 jar。Vault 的 Economy 接口多年未变，拿哪一版编译都一样。
+    // Vault 经济 API。compileOnly：不打进 jar，运行期由服务端上装的 Vault 插件提供。
     //
     // 红线：不要在源码里自己写一个 net.milkbowl.vault.economy.Economy。
     // Bukkit 的插件类加载器是「先查自己的 jar」，同名类会把 Vault 那份遮住，
     // 于是 Vault 的实现类实现的就成了另一个接口，instanceof 与转型全部失效。
-    compileOnly(files("other/Vault.jar"))
+    compileOnly("net.milkbowl.vault:VaultAPI:1.7")
 
     // 网页面板：HTTP + WebSocket。会随插件一起打包，见下面的 jar 配置。
     implementation("io.undertow:undertow-core:2.3.18.Final")
